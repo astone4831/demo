@@ -1,3 +1,5 @@
+#Need to add doc strings and such
+
 using Pkg
 Pkg.add("MusicXML")
 Pkg.add("EzXML")
@@ -9,7 +11,7 @@ using EzXML
 file = "C:\\Users\\stone\\Downloads\\Give A Little Bit.musicxml"
 
 score = readmusicxml_partial(file)
-println(score)
+#println(score)
 
 println(nodecontent.(findall("//work-title", score)))
 
