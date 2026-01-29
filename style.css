@@ -4,7 +4,7 @@
     --primary-blue: #3b82f6;
     --text-main: #f8fafc;
 }
-
+  
 body {
     background-color: var(--bg-color);
     color: var(--text-main);
