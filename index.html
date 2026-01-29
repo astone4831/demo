@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Haptic Audio Portal v0.1</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Haptic Signal Processor</h1>
+            <p>Live Audio-to-Tactile Bridge</p>
+            <button id="startBtn">Initialize Audio Engine</button>
+        </header>
+
+        <main>
+            <section class="monitor-section">
+                <canvas id="canvas"></canvas>
+            </section>
+
+            <section class="haptic-proxy">
+                <div id="pulseCircle"></div>
+                <div class="label">Virtual Haptic Pulse</div>
+            </section>
+
+            <section class="controls">
+                <div class="control-group">
+                    <label for="threshold">Sensitivity Threshold</label>
+                    <input type="range" id="threshold" min="0" max="255" value="80">
+                    <span id="thresholdVal">80</span>
+                </div>
+            </section>
+
+            <footer class="telemetry">
+                <div class="stat">Status: <span id="status">Idle</span></div>
+                <div class="stat">Latency: <span id="latency">0</span>ms</div>
+                <div class="stat">Bass: <span id="bassVal">0</span></div>
+            </footer>
+        </main>
+    </div>
+    <script src="audio-engine.js"></script>
+</body>
+</html>
