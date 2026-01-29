@@ -1,0 +1,11 @@
+# OS Metadata
+.DS_Store
+Thumbs.db
+
+# IDE Settings
+.vscode/
+.idea/
+
+# Potential future dependencies
+node_modules/
+dist/
