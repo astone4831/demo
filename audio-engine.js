@@ -1,93 +1,95 @@
-let audioContext, analyser, dataArray, gainNode;
+let audioContext, analyser, dataArray;
+let activeNodeId = null;
 
-const startBtn = document.getElementById('startBtn');
-const canvas = document.getElementById('canvas');
-const ctx = canvas.getContext('2d');
+// The "Brain" - Stores mix settings for every part of the body
+const bodyState = {
+    "node-L-Shoulder": { label: "Left Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 80 },
+    "node-R-Shoulder": { label: "Right Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 80 },
+    "node-Chest": { label: "Chest", bass: 1.0, mid: 0.1, high: 0.0, threshold: 60 },
+    "node-Stomach": { label: "Stomach", bass: 0.9, mid: 0.3, high: 0.0, threshold: 70 },
+    "node-Ribs": { label: "Ribs", bass: 0.5, mid: 0.7, high: 0.2, threshold: 90 },
+    "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 80 }
+};
 
-// Sliders
-const gSlider = document.getElementById('gainSlider');
-const gDisp = document.getElementById('gainDisp');
-const tBass = document.getElementById('thresholdBass');
-const tMid = document.getElementById('thresholdMid');
-const tHigh = document.getElementById('thresholdHigh');
+// UI Selectors
+const bodyView = document.getElementById('bodyView');
+const mixerView = document.getElementById('mixerView');
 
-// UI Circles
-const pBass = document.getElementById('pulseBass');
-const pMid = document.getElementById('pulseMid');
-const pHigh = document.getElementById('pulseHigh');
+// 1. NAVIGATION LOGIC
+document.querySelectorAll('.node').forEach(node => {
+    node.addEventListener('click', () => {
+        activeNodeId = node.id;
+        showMixer(activeNodeId);
+    });
+});
 
-startBtn.addEventListener('click', async () => {
-    try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioContext.createMediaStreamSource(stream);
+document.getElementById('backBtn').addEventListener('click', () => {
+    mixerView.classList.add('hidden');
+    bodyView.classList.remove('hidden');
+});
 
-        // Pre-processing: Gain
-        gainNode = audioContext.createGain();
-        source.connect(gainNode);
+function showMixer(id) {
+    const settings = bodyState[id];
+    document.getElementById('activeNodeLabel').innerText = settings.label;
+    document.getElementById('mix-bass').value = settings.bass;
+    document.getElementById('mix-mid').value = settings.mid;
+    document.getElementById('mix-high').value = settings.high;
+    document.getElementById('node-threshold').value = settings.threshold;
+    
+    bodyView.classList.add('hidden');
+    mixerView.classList.remove('hidden');
+}
 
-        // Analysis
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        gainNode.connect(analyser);
+// Update state when sliders move
+['bass', 'mid', 'high', 'threshold'].forEach(key => {
+    const el = document.getElementById(key === 'threshold' ? `node-threshold` : `mix-${key}`);
+    el.addEventListener('input', (e) => {
+        if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
+    });
+});
 
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        
-        startBtn.style.display = 'none';
-        document.getElementById('status').innerText = "Active";
-        
-        render();
-    } catch (e) {
-        alert("Microphone access is required for this app.");
-    }
+// 2. AUDIO ENGINE
+document.getElementById('startBtn').addEventListener('click', async () => {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    source.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    document.getElementById('startBtn').style.display = 'none';
+    render();
 });
 
 function render() {
     requestAnimationFrame(render);
-    const start = performance.now();
-
-    // 1. Update Gain from Slider
-    if (gainNode) {
-        gainNode.gain.value = gSlider.value;
-        gDisp.innerText = gSlider.value;
-    }
-
+    if (!analyser) return;
     analyser.getByteFrequencyData(dataArray);
 
-    // 2. Draw Visualizer
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    const barW = (canvas.width / dataArray.length) * 2;
-    dataArray.forEach((v, i) => {
-        ctx.fillStyle = i < 10 ? '#3b82f6' : i < 50 ? '#10b981' : '#f59e0b';
-        ctx.fillRect(barW * i, canvas.height - v/2, barW - 1, v/2);
+    // Get basic band energy
+    const b = getAvg(0, 8);
+    const m = getAvg(9, 45);
+    const h = getAvg(46, 100);
+
+    // Pulse the body nodes based on their specific mix settings
+    Object.keys(bodyState).forEach(id => {
+        const s = bodyState[id];
+        const mixedIntensity = (b * s.bass) + (m * s.mid) + (h * s.high);
+        const nodeEl = document.getElementById(id);
+        
+        if (mixedIntensity > s.threshold) {
+            const scale = 1 + (mixedIntensity / 512);
+            nodeEl.style.transformOrigin = "center";
+            nodeEl.setAttribute('r', 8 * scale);
+            nodeEl.classList.add('active-glow');
+        } else {
+            nodeEl.setAttribute('r', 8);
+            nodeEl.classList.remove('active-glow');
+        }
     });
-
-    // 3. Process 3 Bands
-    // Bass: 0-150Hz, Mids: 150Hz-2kHz, Highs: 2kHz+
-    const bVal = getAvg(0, 8);
-    const mVal = getAvg(9, 45);
-    const hVal = getAvg(46, 100);
-
-    updateUI(pBass, bVal, tBass.value);
-    updateUI(pMid, mVal, tMid.value);
-    updateUI(pHigh, hVal, tHigh.value);
-
-    // 4. Performance Telemetry
-    document.getElementById('latency').innerText = (performance.now() - start).toFixed(2);
 }
 
 function getAvg(start, end) {
     const slice = dataArray.slice(start, end);
     return slice.reduce((a, b) => a + b, 0) / slice.length;
-}
-
-function updateUI(el, val, threshold) {
-    if (val > threshold) {
-        const intensity = (val - threshold) / (255 - threshold);
-        el.style.transform = `scale(${1 + intensity * 1.6})`;
-        el.style.opacity = "1";
-    } else {
-        el.style.transform = "scale(1)";
-        el.style.opacity = "0.1";
-    }
 }

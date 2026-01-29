@@ -3,60 +3,60 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Haptic Portal v0.2 - Multi-Band</title>
+    <title>Haptic Body Mapper v0.3</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
     <div class="container">
-        <header>
-            <h1>Haptic Signal Processor</h1>
-            <button id="startBtn">Initialize Audio Engine</button>
-        </header>
+        <section id="bodyView">
+            <header>
+                <h1>Body Control</h1>
+                <button id="startBtn">Start Engine</button>
+            </header>
+            
+            <div class="canvas-container">
+                <canvas id="canvas"></canvas> </div>
 
-        <main>
-            <canvas id="canvas"></canvas>
+            <div class="svg-container">
+                <svg viewBox="0 0 200 300" id="bodySvg">
+                    <path d="M100,20 Q120,20 120,40 L120,50 L140,60 L150,120 L130,120 L125,80 L120,80 L120,280 L80,280 L80,80 L75,80 L70,120 L50,120 L60,60 L80,50 L80,40 Q80,20 100,20" fill="#1e293b" stroke="#334155"/>
+                    <circle class="node" id="node-L-Shoulder" cx="75" cy="65" r="8" data-label="Left Shoulder" />
+                    <circle class="node" id="node-R-Shoulder" cx="125" cy="65" r="8" data-label="Right Shoulder" />
+                    <circle class="node" id="node-Chest" cx="100" cy="85" r="10" data-label="Chest" />
+                    <circle class="node" id="node-Stomach" cx="100" cy="130" r="10" data-label="Stomach" />
+                    <circle class="node" id="node-Ribs" cx="100" cy="105" r="9" data-label="Ribs" />
+                    <circle class="node" id="node-Back" cx="100" cy="115" r="6" stroke-dasharray="2" data-label="Back (Spine)" />
+                </svg>
+            </div>
+            <p class="hint">Tap a node to configure haptics</p>
+        </section>
 
-            <section class="haptic-grid">
-                <div class="haptic-channel">
-                    <div id="pulseBass" class="pulse-circle bass"></div>
-                    <span>BASS</span>
-                </div>
-                <div class="haptic-channel">
-                    <div id="pulseMid" class="pulse-circle mid"></div>
-                    <span>MID</span>
-                </div>
-                <div class="haptic-channel">
-                    <div id="pulseHigh" class="pulse-circle high"></div>
-                    <span>HIGH</span>
-                </div>
-            </section>
+        <section id="mixerView" class="hidden">
+            <header>
+                <button id="backBtn">← Back</button>
+                <h2 id="activeNodeLabel">Node Settings</h2>
+            </header>
 
-            <section class="controls-rack">
-                <div class="control-group">
-                    <label>Master Input Gain: <span id="gainDisp">1</span>x</label>
-                    <input type="range" id="gainSlider" min="1" max="20" step="0.5" value="1">
+            <div class="mixer-card">
+                <div class="fader-group">
+                    <label>BASS</label>
+                    <input type="range" class="v-fader" id="mix-bass" min="0" max="1" step="0.1">
                 </div>
-                <hr>
-                <div class="control-group">
-                    <label>Bass Sensitivity</label>
-                    <input type="range" id="thresholdBass" min="0" max="255" value="80">
+                <div class="fader-group">
+                    <label>MID</label>
+                    <input type="range" class="v-fader" id="mix-mid" min="0" max="1" step="0.1">
                 </div>
-                <div class="control-group">
-                    <label>Mid Sensitivity</label>
-                    <input type="range" id="thresholdMid" min="0" max="255" value="60">
+                <div class="fader-group">
+                    <label>HIGH</label>
+                    <input type="range" class="v-fader" id="mix-high" min="0" max="1" step="0.1">
                 </div>
-                <div class="control-group">
-                    <label>High Sensitivity</label>
-                    <input type="range" id="thresholdHigh" min="0" max="255" value="40">
-                </div>
-            </section>
-
-            <footer class="telemetry">
-                <div class="stat">Status: <span id="status">Idle</span></div>
-                <div class="stat">Latency: <span id="latency">0</span>ms</div>
-                <div class="stat">Active Pins: <span>3</span></div>
-            </footer>
-        </main>
+            </div>
+            
+            <div class="control-group">
+                <label>Node Sensitivity Threshold</label>
+                <input type="range" id="node-threshold" min="0" max="255" value="80">
+            </div>
+        </section>
     </div>
     <script src="audio-engine.js"></script>
 </body>
