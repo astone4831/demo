@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Haptic Portal v0.3</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Haptic Mapper v0.3</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -19,12 +19,14 @@
             <div class="svg-container">
                 <svg viewBox="0 0 200 200" id="bodySvg">
                     <path d="M70,40 Q100,35 130,40 L145,60 L140,140 L60,140 L55,60 Z" fill="#1e293b" stroke="#475569" stroke-width="2"/>
-                    <circle cx="100" cy="25" r="15" fill="#1e293b" stroke="#475569" stroke-width="2"/> <circle class="node" id="node-L-Shoulder" cx="65" cy="55" r="10" data-label="Left Shoulder" />
-                    <circle class="node" id="node-R-Shoulder" cx="135" cy="55" r="10" data-label="Right Shoulder" />
-                    <circle class="node" id="node-Chest" cx="100" cy="75" r="12" data-label="Chest" />
-                    <circle class="node" id="node-Ribs" cx="100" cy="100" r="10" data-label="Ribs" />
-                    <circle class="node" id="node-Stomach" cx="100" cy="125" r="10" data-label="Stomach" />
-                    <circle class="node" id="node-Back" cx="100" cy="90" r="8" stroke-dasharray="3" data-label="Back" />
+                    <circle cx="100" cy="25" r="15" fill="#1e293b" stroke="#475569" stroke-width="2"/>
+                    
+                    <circle class="node" id="node-L-Shoulder" cx="65" cy="55" r="10" />
+                    <circle class="node" id="node-R-Shoulder" cx="135" cy="55" r="10" />
+                    <circle class="node" id="node-Chest" cx="100" cy="75" r="12" />
+                    <circle class="node" id="node-Ribs" cx="100" cy="100" r="10" />
+                    <circle class="node" id="node-Stomach" cx="100" cy="125" r="10" />
+                    <circle class="node" id="node-Back" cx="100" cy="90" r="8" stroke-dasharray="3" />
                 </svg>
             </div>
             <p class="hint">Tap a node to configure</p>
@@ -43,5 +45,11 @@
             </div>
             
             <div class="control-group">
-                <label>Sensitivity Threshold</label>
-                <input type="range" id="node-threshold" min="0" max="
+                <label>Node Threshold</label>
+                <input type="range" id="node-threshold" min="0" max="255" value="80">
+            </div>
+        </section>
+    </div>
+    <script src="audio-engine.js"></script>
+</body>
+</html>

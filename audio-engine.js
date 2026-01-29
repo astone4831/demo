@@ -10,53 +10,24 @@ const bodyState = {
     "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 80 }
 };
 
-// INITIALIZE CLICK LISTENERS
-document.addEventListener('DOMContentLoaded', () => {
-    const nodes = document.querySelectorAll('.node');
-    nodes.forEach(node => {
-        node.onclick = function() {
-            activeNodeId = this.id;
-            const settings = bodyState[activeNodeId];
-            
-            document.getElementById('activeNodeLabel').innerText = settings.label;
-            document.getElementById('mix-bass').value = settings.bass;
-            document.getElementById('mix-mid').value = settings.mid;
-            document.getElementById('mix-high').value = settings.high;
-            document.getElementById('node-threshold').value = settings.threshold;
-            
-            document.getElementById('bodyView').classList.add('hidden');
-            document.getElementById('mixerView').classList.remove('hidden');
-        };
-    });
-});
-
-document.getElementById('backBtn').onclick = () => {
-    document.getElementById('mixerView').classList.add('hidden');
-    document.getElementById('bodyView').classList.remove('hidden');
-};
-
-// SLIDER UPDATES
-['bass', 'mid', 'high'].forEach(key => {
-    document.getElementById(`mix-${key}`).oninput = (e) => {
-        if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
-    };
-});
-document.getElementById('node-threshold').oninput = (e) => {
-    if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
-};
-
-// AUDIO ENGINE
-document.getElementById('startBtn').onclick = async () => {
-    audioContext = new (window.AudioContext || window.webkitAudioContext)();
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const source = audioContext.createMediaStreamSource(stream);
-    analyser = audioContext.createAnalyser();
-    analyser.fftSize = 256;
-    source.connect(analyser);
-    dataArray = new Uint8Array(analyser.frequencyBinCount);
-    document.getElementById('startBtn').style.display = 'none';
-    render();
-};
+// --- CORE ENGINE ---
+async function initAudio() {
+    try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const source = audioContext.createMediaStreamSource(stream);
+        
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 256;
+        source.connect(analyser);
+        
+        dataArray = new Uint8Array(analyser.frequencyBinCount);
+        document.getElementById('startBtn').style.display = 'none';
+        render();
+    } catch (err) {
+        alert("Mic Error: " + err);
+    }
+}
 
 function render() {
     requestAnimationFrame(render);
@@ -72,10 +43,10 @@ function render() {
         const mixed = (b * s.bass) + (m * s.mid) + (h * s.high);
         const el = document.getElementById(id);
         
-        if (mixed > s.threshold) {
+        if (el && mixed > s.threshold) {
             el.classList.add('active-glow');
-            el.setAttribute('r', 12); 
-        } else {
+            el.setAttribute('r', 13); 
+        } else if (el) {
             el.classList.remove('active-glow');
             el.setAttribute('r', 10);
         }
@@ -86,3 +57,41 @@ function getAvg(start, end) {
     const slice = dataArray.slice(start, end);
     return slice.reduce((a, b) => a + b, 0) / slice.length;
 }
+
+// --- UI CONTROLS ---
+
+// 1. Audio Start
+document.getElementById('startBtn').onclick = initAudio;
+
+// 2. Node Clicks (Delegated for reliability)
+document.addEventListener('click', (e) => {
+    if (e.target.classList.contains('node')) {
+        activeNodeId = e.target.id;
+        const s = bodyState[activeNodeId];
+        
+        document.getElementById('activeNodeLabel').innerText = s.label;
+        document.getElementById('mix-bass').value = s.bass;
+        document.getElementById('mix-mid').value = s.mid;
+        document.getElementById('mix-high').value = s.high;
+        document.getElementById('node-threshold').value = s.threshold;
+        
+        document.getElementById('bodyView').classList.add('hidden');
+        document.getElementById('mixerView').classList.remove('hidden');
+    }
+});
+
+// 3. Back Button
+document.getElementById('backBtn').onclick = () => {
+    document.getElementById('mixerView').classList.add('hidden');
+    document.getElementById('bodyView').classList.remove('hidden');
+};
+
+// 4. Settings Sync
+['bass', 'mid', 'high'].forEach(key => {
+    document.getElementById(`mix-${key}`).oninput = (e) => {
+        if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
+    };
+});
+document.getElementById('node-threshold').oninput = (e) => {
+    if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+};
