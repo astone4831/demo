@@ -1,94 +1,36 @@
 :root {
-    --bg-color: #0f172a;
-    --card-bg: #1e293b;
-    --primary-blue: #3b82f6;
-    --text-main: #f8fafc;
-}
-  
-body {
-    background-color: var(--bg-color);
-    color: var(--text-main);
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-    margin: 0;
-    display: flex;
-    justify-content: center;
-    min-height: 100vh;
+    --bg: #0f172a;
+    --card: #1e293b;
+    --text: #f8fafc;
+    --blue: #3b82f6;
+    --green: #10b981;
+    --orange: #f59e0b;
 }
 
-.container {
-    width: 90%;
-    max-width: 600px;
-    padding: 2rem 0;
-    text-align: center;
+body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; display: flex; justify-content: center; }
+.container { width: 95%; max-width: 600px; padding: 20px; text-align: center; }
+
+#startBtn { background: var(--blue); color: white; border: none; padding: 15px 30px; border-radius: 30px; cursor: pointer; font-weight: bold; margin-bottom: 20px; }
+
+#canvas { width: 100%; height: 100px; background: #020617; border-radius: 10px; margin-bottom: 20px; }
+
+.haptic-grid { 
+    display: flex; justify-content: space-around; 
+    background: #020617; padding: 30px 10px; border-radius: 15px; margin-bottom: 20px;
 }
 
-header h1 { margin-bottom: 0.5rem; letter-spacing: -1px; }
-header p { color: #94a3b8; margin-bottom: 2rem; }
+.haptic-channel { display: flex; flex-direction: column; align-items: center; gap: 10px; font-size: 0.7rem; font-weight: bold; }
 
-#startBtn {
-    background: var(--primary-blue);
-    color: white;
-    border: none;
-    padding: 1rem 2.5rem;
-    border-radius: 50px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: transform 0.2s;
-}
+.pulse-circle { width: 60px; height: 60px; border-radius: 50%; opacity: 0.1; transition: transform 0.05s ease-out; }
+.bass { background: var(--blue); box-shadow: 0 0 15px var(--blue); }
+.mid { background: var(--green); box-shadow: 0 0 15px var(--green); }
+.high { background: var(--orange); box-shadow: 0 0 15px var(--orange); }
 
-#startBtn:active { transform: scale(0.95); }
-
-#canvas {
-    width: 100%;
-    height: 120px;
-    background: #020617;
-    border-radius: 12px;
-    margin: 2rem 0;
-}
-
-.haptic-proxy {
-    height: 200px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    background: radial-gradient(circle, #1e293b 0%, #0f172a 100%);
-    border-radius: 50%;
-    margin: 2rem auto;
-    width: 200px;
-}
-
-#pulseCircle {
-    width: 60px;
-    height: 60px;
-    background: var(--primary-blue);
-    border-radius: 50%;
-    transition: transform 0.05s ease-out, opacity 0.1s;
-    opacity: 0.2;
-}
-
-.controls {
-    background: var(--card-bg);
-    padding: 1.5rem;
-    border-radius: 16px;
-    margin-bottom: 2rem;
-}
-
-.control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
+.controls-rack { background: var(--card); padding: 20px; border-radius: 15px; display: flex; flex-direction: column; gap: 15px; }
+.control-group { display: flex; flex-direction: column; text-align: left; gap: 5px; font-size: 0.9rem; }
+hr { border: 0; border-top: 1px solid #334155; width: 100%; }
 
 input[type=range] { width: 100%; cursor: pointer; }
 
-.telemetry {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    font-family: monospace;
-    font-size: 0.85rem;
-    color: #94a3b8;
-}
-
-.stat { background: var(--card-bg); padding: 10px; border-radius: 8px; }
+.telemetry { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 20px; font-family: monospace; font-size: 0.75rem; color: #94a3b8; }
+.stat { background: var(--card); padding: 8px; border-radius: 5px; }
