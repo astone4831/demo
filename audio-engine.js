@@ -1,55 +1,52 @@
 let audioContext, analyser, dataArray;
 let activeNodeId = null;
 
-// The "Brain" - Stores mix settings for every part of the body
 const bodyState = {
     "node-L-Shoulder": { label: "Left Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 80 },
     "node-R-Shoulder": { label: "Right Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 80 },
     "node-Chest": { label: "Chest", bass: 1.0, mid: 0.1, high: 0.0, threshold: 60 },
-    "node-Stomach": { label: "Stomach", bass: 0.9, mid: 0.3, high: 0.0, threshold: 70 },
     "node-Ribs": { label: "Ribs", bass: 0.5, mid: 0.7, high: 0.2, threshold: 90 },
+    "node-Stomach": { label: "Stomach", bass: 0.9, mid: 0.3, high: 0.0, threshold: 70 },
     "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 80 }
 };
 
-// UI Selectors
-const bodyView = document.getElementById('bodyView');
-const mixerView = document.getElementById('mixerView');
-
-// 1. NAVIGATION LOGIC
-document.querySelectorAll('.node').forEach(node => {
-    node.addEventListener('click', () => {
-        activeNodeId = node.id;
-        showMixer(activeNodeId);
+// INITIALIZE CLICK LISTENERS
+document.addEventListener('DOMContentLoaded', () => {
+    const nodes = document.querySelectorAll('.node');
+    nodes.forEach(node => {
+        node.onclick = function() {
+            activeNodeId = this.id;
+            const settings = bodyState[activeNodeId];
+            
+            document.getElementById('activeNodeLabel').innerText = settings.label;
+            document.getElementById('mix-bass').value = settings.bass;
+            document.getElementById('mix-mid').value = settings.mid;
+            document.getElementById('mix-high').value = settings.high;
+            document.getElementById('node-threshold').value = settings.threshold;
+            
+            document.getElementById('bodyView').classList.add('hidden');
+            document.getElementById('mixerView').classList.remove('hidden');
+        };
     });
 });
 
-document.getElementById('backBtn').addEventListener('click', () => {
-    mixerView.classList.add('hidden');
-    bodyView.classList.remove('hidden');
-});
+document.getElementById('backBtn').onclick = () => {
+    document.getElementById('mixerView').classList.add('hidden');
+    document.getElementById('bodyView').classList.remove('hidden');
+};
 
-function showMixer(id) {
-    const settings = bodyState[id];
-    document.getElementById('activeNodeLabel').innerText = settings.label;
-    document.getElementById('mix-bass').value = settings.bass;
-    document.getElementById('mix-mid').value = settings.mid;
-    document.getElementById('mix-high').value = settings.high;
-    document.getElementById('node-threshold').value = settings.threshold;
-    
-    bodyView.classList.add('hidden');
-    mixerView.classList.remove('hidden');
-}
-
-// Update state when sliders move
-['bass', 'mid', 'high', 'threshold'].forEach(key => {
-    const el = document.getElementById(key === 'threshold' ? `node-threshold` : `mix-${key}`);
-    el.addEventListener('input', (e) => {
+// SLIDER UPDATES
+['bass', 'mid', 'high'].forEach(key => {
+    document.getElementById(`mix-${key}`).oninput = (e) => {
         if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
-    });
+    };
 });
+document.getElementById('node-threshold').oninput = (e) => {
+    if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+};
 
-// 2. AUDIO ENGINE
-document.getElementById('startBtn').addEventListener('click', async () => {
+// AUDIO ENGINE
+document.getElementById('startBtn').onclick = async () => {
     audioContext = new (window.AudioContext || window.webkitAudioContext)();
     const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     const source = audioContext.createMediaStreamSource(stream);
@@ -59,32 +56,28 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     dataArray = new Uint8Array(analyser.frequencyBinCount);
     document.getElementById('startBtn').style.display = 'none';
     render();
-});
+};
 
 function render() {
     requestAnimationFrame(render);
     if (!analyser) return;
     analyser.getByteFrequencyData(dataArray);
 
-    // Get basic band energy
     const b = getAvg(0, 8);
     const m = getAvg(9, 45);
     const h = getAvg(46, 100);
 
-    // Pulse the body nodes based on their specific mix settings
     Object.keys(bodyState).forEach(id => {
         const s = bodyState[id];
-        const mixedIntensity = (b * s.bass) + (m * s.mid) + (h * s.high);
-        const nodeEl = document.getElementById(id);
+        const mixed = (b * s.bass) + (m * s.mid) + (h * s.high);
+        const el = document.getElementById(id);
         
-        if (mixedIntensity > s.threshold) {
-            const scale = 1 + (mixedIntensity / 512);
-            nodeEl.style.transformOrigin = "center";
-            nodeEl.setAttribute('r', 8 * scale);
-            nodeEl.classList.add('active-glow');
+        if (mixed > s.threshold) {
+            el.classList.add('active-glow');
+            el.setAttribute('r', 12); 
         } else {
-            nodeEl.setAttribute('r', 8);
-            nodeEl.classList.remove('active-glow');
+            el.classList.remove('active-glow');
+            el.setAttribute('r', 10);
         }
     });
 }
