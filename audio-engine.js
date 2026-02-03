@@ -24,34 +24,36 @@ async function initAudio() {
         render();
     } catch (e) { 
         console.error(e);
-        alert("Microphone access denied or error occurred."); 
+        alert("Microphone access denied."); 
     }
 }
 
-// --- INTIFACE / BUTTPLUG CONNECTION ---
+// --- INTIFACE / BUTTPLUG CONNECTION (v3.0.0 FIX) ---
 async function initIntiface() {
     const btn = document.getElementById('intifaceBtn');
     btn.innerText = "Connecting...";
     
     try {
-        // Initialize the library
-        await Buttplug.buttplugInit();
-        
-        // Setup connector (ws://localhost:12345/buttplug is the default)
-        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345");
+        // In v3.0, we use ButtplugClient and the Websocket Connector directly
         bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
 
+        // The connector class name updated in v3
+        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345");
+
         await bpClient.connect(connector);
+        
         btn.innerText = "CONNECTED";
         btn.style.background = "var(--green)";
         
         // Start scanning for hardware
         await bpClient.startScanning();
+        
+        console.log("Intiface Connected. Scanning for devices...");
     } catch (e) {
-        console.error(e);
+        console.error("Connection Error:", e);
         btn.innerText = "RETRY INTIFACE";
         btn.style.background = "var(--red)";
-        alert("Could not connect to Intiface Central. Ensure the server is STARTED in the app.");
+        alert("Could not connect. Is Intiface Central running with the Server STARTED?");
     }
 }
 
@@ -92,11 +94,13 @@ function render() {
                 el.setAttribute('r', 10 + (intensity/25));
                 
                 // --- PHYSICAL HAPTIC OUTPUT ---
-                // Maps the average intensity to all connected devices
-                if (bpClient && bpClient.devices.length > 0) {
+                if (bpClient && bpClient.connected && bpClient.devices.length > 0) {
                     const power = Math.min(intensity / 255, 1.0);
                     bpClient.devices.forEach(d => {
-                        if (d.vibrateAttributes.length > 0) d.vibrate(power);
+                        // Check if device supports vibration
+                        if (d.vibrateAttributes.length > 0) {
+                            d.vibrate(power).catch(() => {}); // Send and ignore errors
+                        }
                     });
                 }
             } else {
@@ -114,7 +118,7 @@ function getAvg(start, end) {
     return sum / (end - start + 1);
 }
 
-// --- UI EVENT BINDING ---
+// --- UI FLOW ---
 function openMixer(id) {
     activeNodeId = id;
     const s = bodyState[id];
@@ -128,7 +132,6 @@ function openMixer(id) {
     document.getElementById('mixerView').classList.remove('hidden');
 }
 
-// Re-bind buttons after script load
 window.onload = () => {
     document.getElementById('startBtn').onclick = initAudio;
     document.getElementById('intifaceBtn').onclick = initIntiface;
@@ -141,13 +144,19 @@ window.onload = () => {
         if (e.target.classList.contains('node')) openMixer(e.target.id);
     });
 
-    // Slider Listeners
     ['bass', 'mid', 'high'].forEach(key => {
-        document.getElementById(`mix-${key}`).oninput = (e) => {
-            if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
-        };
+        const el = document.getElementById(`mix-${key}`);
+        if(el) {
+            el.oninput = (e) => {
+                if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
+            };
+        }
     });
-    document.getElementById('node-threshold').oninput = (e) => {
-        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
-    };
+    
+    const thresh = document.getElementById('node-threshold');
+    if(thresh) {
+        thresh.oninput = (e) => {
+            if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+        };
+    }
 };
