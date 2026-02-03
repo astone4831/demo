@@ -1,49 +1,59 @@
-let audioContext, analyser, dataArray;
+let audioContext, analyser, dataArray, bpClient;
 let activeNodeId = null;
 
 const bodyState = {
-    "node-L-Shoulder": { label: "Left Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 80 },
-    "node-R-Shoulder": { label: "Right Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 80 },
-    "node-Chest": { label: "Chest", bass: 1.0, mid: 0.1, high: 0.0, threshold: 60 },
-    "node-Ribs": { label: "Ribs", bass: 0.5, mid: 0.7, high: 0.2, threshold: 90 },
-    "node-Stomach": { label: "Stomach", bass: 0.9, mid: 0.3, high: 0.0, threshold: 70 },
-    "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 80 }
+    "node-L-Shoulder": { label: "Left Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 50 },
+    "node-R-Shoulder": { label: "Right Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 50 },
+    "node-Chest": { label: "Chest", bass: 1.0, mid: 0.1, high: 0.0, threshold: 40 },
+    "node-Ribs": { label: "Ribs", bass: 0.5, mid: 0.7, high: 0.2, threshold: 60 },
+    "node-Stomach": { label: "Stomach", bass: 0.9, mid: 0.3, high: 0.0, threshold: 50 },
+    "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 50 }
 };
 
-// --- CORE ENGINE ---
-async function initAudio() {
+// --- BUTTPLUG / INTIFACE SETUP ---
+async function initIntiface() {
+    const connector = new Buttplug.ButtplugBrowserWebsocketConnectorOptions("ws://localhost:12345/buttplug");
+    bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
     try {
-        audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-        const source = audioContext.createMediaStreamSource(stream);
-        
-        analyser = audioContext.createAnalyser();
-        analyser.fftSize = 256;
-        source.connect(analyser);
-        
-        dataArray = new Uint8Array(analyser.frequencyBinCount);
-        document.getElementById('startBtn').style.display = 'none';
-        render();
-    } catch (err) {
-        console.error("Mic error:", err);
+        await bpClient.connect(connector);
+        document.getElementById('intifaceBtn').innerText = "CONNECTED";
+        document.getElementById('intifaceBtn').style.background = "#10b981";
+        await bpClient.startScanning();
+    } catch (e) {
+        alert("Intiface Central not found. Make sure it's running on port 12345.");
     }
 }
 
-// THE FIX: Direct color mapping based on dominance
-function getDominantColor(b, m, h) {
-    // If it's mostly bass, Hue = 220 (Blue)
-    // If it's mostly mids, Hue = 140 (Green/Teal)
-    // If it's mostly highs, Hue = 0 (Red)
+// --- COLOR MATH ---
+function getDynamicColor(b, m, h) {
+    const total = b + m + h;
+    if (total < 5) return '#334155';
+
+    // Normalize values to find the winner
+    // We boost Highs (h * 2) because mics are usually weak there
+    const bWeight = b;
+    const mWeight = m * 1.5;
+    const hWeight = h * 3.0; 
+
+    const max = Math.max(bWeight, mWeight, hWeight);
     
-    const maxVal = Math.max(b, m, h);
-    if (maxVal < 5) return '#334155'; // Dead state
+    if (max === bWeight) return `hsl(220, 90%, 60%)`; // Blue
+    if (max === mWeight) return `hsl(150, 90%, 60%)`; // Green/Teal
+    return `hsl(0, 95%, 60%)`; // Red
+}
 
-    let hue;
-    if (maxVal === b) hue = 220; // Bass Blue
-    else if (maxVal === m) hue = 140; // Mid Green
-    else hue = 0; // High Red
-
-    return `hsl(${hue}, 90%, 60%)`;
+// --- ENGINE ---
+async function initAudio() {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const source = audioContext.createMediaStreamSource(stream);
+    analyser = audioContext.createAnalyser();
+    analyser.fftSize = 256;
+    analyser.smoothingTimeConstant = 0.5; // Faster response
+    source.connect(analyser);
+    dataArray = new Uint8Array(analyser.frequencyBinCount);
+    document.getElementById('startBtn').style.display = 'none';
+    render();
 }
 
 function render() {
@@ -51,28 +61,30 @@ function render() {
     if (!analyser) return;
     analyser.getByteFrequencyData(dataArray);
 
-    // Get Raw Band Energy
-    const rawB = getAvg(0, 6);
-    const rawM = getAvg(7, 30);
-    const rawH = getAvg(31, 100);
+    const rawB = getAvg(0, 4);
+    const rawM = getAvg(10, 40);
+    const rawH = getAvg(50, 100);
 
     Object.keys(bodyState).forEach(id => {
         const s = bodyState[id];
+        const nB = rawB * s.bass;
+        const nM = rawM * s.mid;
+        const nH = rawH * s.high;
+        const intensity = nB + nM + nH;
         
-        // Calculate the specific energy for THIS node's settings
-        const nodeB = rawB * s.bass;
-        const nodeM = rawM * s.mid;
-        const nodeH = rawH * s.high;
-        
-        const mixedTotal = nodeB + nodeM + nodeH;
         const el = document.getElementById(id);
-        
         if (el) {
-            if (mixedTotal > s.threshold) {
-                const color = getDominantColor(nodeB, nodeM, nodeH);
+            if (intensity > s.threshold) {
+                const color = getDynamicColor(nB, nM, nH);
                 el.style.fill = color;
-                el.style.filter = `drop-shadow(0 0 12px ${color})`;
-                el.setAttribute('r', 10 + (mixedTotal / 40)); 
+                el.style.filter = `drop-shadow(0 0 10px ${color})`;
+                el.setAttribute('r', 10 + (intensity/30));
+                
+                // --- SEND TO INTIFACE ---
+                if (bpClient && bpClient.devices.length > 0) {
+                    const motorPower = Math.min(intensity / 200, 1.0);
+                    bpClient.devices.forEach(d => d.vibrate(motorPower));
+                }
             } else {
                 el.style.fill = "#334155";
                 el.style.filter = "none";
@@ -83,25 +95,27 @@ function render() {
 }
 
 function getAvg(start, end) {
-    const slice = dataArray.slice(start, end);
-    return slice.reduce((a, b) => a + b, 0) / slice.length;
+    let sum = 0;
+    for (let i = start; i <= end; i++) sum += dataArray[i];
+    return sum / (end - start + 1);
 }
 
-// --- UI EVENT BINDING ---
+// --- UI ---
 window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('startBtn').onclick = initAudio;
+    if(document.getElementById('intifaceBtn')) {
+        document.getElementById('intifaceBtn').onclick = initIntiface;
+    }
 
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('node')) {
             activeNodeId = e.target.id;
             const s = bodyState[activeNodeId];
-            
             document.getElementById('activeNodeLabel').innerText = s.label;
             document.getElementById('mix-bass').value = s.bass;
             document.getElementById('mix-mid').value = s.mid;
             document.getElementById('mix-high').value = s.high;
             document.getElementById('node-threshold').value = s.threshold;
-            
             document.getElementById('bodyView').classList.add('hidden');
             document.getElementById('mixerView').classList.remove('hidden');
         }
@@ -110,15 +124,5 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('backBtn').onclick = () => {
         document.getElementById('mixerView').classList.add('hidden');
         document.getElementById('bodyView').classList.remove('hidden');
-    };
-
-    // Sliders Sync
-    ['bass', 'mid', 'high'].forEach(key => {
-        document.getElementById(`mix-${key}`).oninput = (e) => {
-            if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
-        };
-    });
-    document.getElementById('node-threshold').oninput = (e) => {
-        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
     };
 });
