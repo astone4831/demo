@@ -22,19 +22,37 @@ async function initAudio() {
         dataArray = new Uint8Array(analyser.frequencyBinCount);
         document.getElementById('startBtn').style.display = 'none';
         render();
-    } catch (e) { alert("Mic Access Denied"); }
+    } catch (e) { 
+        console.error(e);
+        alert("Microphone access denied or error occurred."); 
+    }
 }
 
-// --- INTIFACE CONNECTION ---
+// --- INTIFACE / BUTTPLUG CONNECTION ---
 async function initIntiface() {
-    const connector = new Buttplug.ButtplugBrowserWebsocketConnectorOptions("ws://localhost:12345/buttplug");
-    bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
+    const btn = document.getElementById('intifaceBtn');
+    btn.innerText = "Connecting...";
+    
     try {
+        // Initialize the library
+        await Buttplug.buttplugInit();
+        
+        // Setup connector (ws://localhost:12345/buttplug is the default)
+        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345/buttplug");
+        bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
+
         await bpClient.connect(connector);
-        document.getElementById('intifaceBtn').innerText = "DEVICE CONNECTED";
-        document.getElementById('intifaceBtn').style.background = "#10b981";
+        btn.innerText = "CONNECTED";
+        btn.style.background = "var(--green)";
+        
+        // Start scanning for hardware
         await bpClient.startScanning();
-    } catch (e) { alert("Intiface Central not detected. Is it running on port 12345?"); }
+    } catch (e) {
+        console.error(e);
+        btn.innerText = "RETRY INTIFACE";
+        btn.style.background = "var(--red)";
+        alert("Could not connect to Intiface Central. Ensure the server is STARTED in the app.");
+    }
 }
 
 // --- COLOR ENGINE ---
@@ -73,10 +91,13 @@ function render() {
                 el.classList.add('active-glow');
                 el.setAttribute('r', 10 + (intensity/25));
                 
-                // Intiface vibration
+                // --- PHYSICAL HAPTIC OUTPUT ---
+                // Maps the average intensity to all connected devices
                 if (bpClient && bpClient.devices.length > 0) {
                     const power = Math.min(intensity / 255, 1.0);
-                    bpClient.devices.forEach(d => d.vibrate(power));
+                    bpClient.devices.forEach(d => {
+                        if (d.vibrateAttributes.length > 0) d.vibrate(power);
+                    });
                 }
             } else {
                 el.style.fill = "#334155";
@@ -93,7 +114,7 @@ function getAvg(start, end) {
     return sum / (end - start + 1);
 }
 
-// --- UI FLOW ---
+// --- UI EVENT BINDING ---
 function openMixer(id) {
     activeNodeId = id;
     const s = bodyState[id];
@@ -107,20 +128,20 @@ function openMixer(id) {
     document.getElementById('mixerView').classList.remove('hidden');
 }
 
-window.addEventListener('DOMContentLoaded', () => {
+// Re-bind buttons after script load
+window.onload = () => {
     document.getElementById('startBtn').onclick = initAudio;
     document.getElementById('intifaceBtn').onclick = initIntiface;
-
-    document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('node')) openMixer(e.target.id);
-    });
-
     document.getElementById('backBtn').onclick = () => {
         document.getElementById('mixerView').classList.add('hidden');
         document.getElementById('bodyView').classList.remove('hidden');
     };
 
-    // Live State Sync
+    document.addEventListener('click', (e) => {
+        if (e.target.classList.contains('node')) openMixer(e.target.id);
+    });
+
+    // Slider Listeners
     ['bass', 'mid', 'high'].forEach(key => {
         document.getElementById(`mix-${key}`).oninput = (e) => {
             if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
@@ -129,44 +150,4 @@ window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('node-threshold').oninput = (e) => {
         if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
     };
-});
-
-
-async function initIntiface() {
-    const btn = document.getElementById('intifaceBtn');
-    btn.innerText = "Connecting...";
-
-    try {
-        // 1. Mandatory Buttplug initialization
-        await Buttplug.buttplugInit();
-
-        // 2. Create the connector to Intiface Central's default port
-        // Note: We use 'ButtplugBrowserWebsocketClientConnector' for web apps
-        const address = "ws://localhost:12345/buttplug";
-        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector(address);
-        
-        bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
-
-        // 3. Set up event listeners BEFORE connecting
-        bpClient.addListener("deviceadded", (device) => {
-            console.log(`Device connected: ${device.name}`);
-            btn.innerText = "DEVICE ACTIVE";
-            btn.style.background = "#10b981";
-        });
-
-        // 4. Attempt the connection
-        await bpClient.connect(connector);
-        console.log("Connected to Intiface Central!");
-        btn.innerText = "SEARCHING...";
-        
-        // 5. Start looking for your Bluetooth/USB devices
-        await bpClient.startScanning();
-
-    } catch (e) {
-        console.error("Connection failed:", e);
-        btn.innerText = "RETRY CONN";
-        btn.style.background = "#ef4444";
-        alert("Connection Failed: Ensure Intiface Central is running and the Server is STARTED (Big Play Button).");
-    }
-}
-
+};
