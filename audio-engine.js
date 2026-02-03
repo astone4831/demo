@@ -25,25 +25,27 @@ async function initAudio() {
     } catch (e) { alert("Mic Access Denied"); }
 }
 
-// --- INTIFACE v3.2.2 FIX ---
+// --- INTIFACE v3.2.2 FINAL STABLE CONNECT ---
 async function initIntiface() {
     const btn = document.getElementById('intifaceBtn');
     
-    // Safety check for the global object
-    if (typeof buttplug === 'undefined') {
-        console.error("Buttplug library not loaded yet.");
-        alert("The library is still loading. Wait 2 seconds and try again.");
+    // FAILSAFE: Find the library regardless of casing
+    const bpLib = window.Buttplug || window.buttplug;
+    
+    if (!bpLib) {
+        console.error("Buttplug library not found in window object.");
+        alert("Library error: Try refreshing. If you're offline, this won't work.");
         return;
     }
 
     btn.innerText = "Connecting...";
     
     try {
-        // Correct namespace for v3 Web
-        bpClient = new buttplug.ButtplugClient("Haptic Mapper");
+        // Instantiate using the library we found
+        bpClient = new bpLib.ButtplugClient("Haptic Mapper");
 
         const address = "ws://localhost:12345/buttplug";
-        const connector = new buttplug.ButtplugBrowserWebsocketClientConnector(address);
+        const connector = new bpLib.ButtplugBrowserWebsocketClientConnector(address);
 
         await bpClient.connect(connector);
         
@@ -54,7 +56,6 @@ async function initIntiface() {
         console.error("Intiface Error:", e);
         btn.innerText = "RETRY";
         btn.style.background = "#ef4444";
-        alert("Ensure Intiface Central is running and the Server is STARTED.");
     }
 }
 
@@ -134,11 +135,18 @@ window.onload = () => {
     });
 
     ['bass', 'mid', 'high'].forEach(k => {
-        document.getElementById(`mix-${k}`).oninput = (e) => {
-            if (activeNodeId) bodyState[activeNodeId][k] = parseFloat(e.target.value);
-        };
+        const slider = document.getElementById(`mix-${k}`);
+        if (slider) {
+            slider.oninput = (e) => {
+                if (activeNodeId) bodyState[activeNodeId][k] = parseFloat(e.target.value);
+            };
+        }
     });
-    document.getElementById('node-threshold').oninput = (e) => {
-        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
-    };
+    
+    const thresh = document.getElementById('node-threshold');
+    if (thresh) {
+        thresh.oninput = (e) => {
+            if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+        };
+    }
 };
