@@ -20,54 +20,47 @@ async function initAudio() {
         analyser.fftSize = 256;
         source.connect(analyser);
         dataArray = new Uint8Array(analyser.frequencyBinCount);
-        document.getElementById('startBtn').style.display = 'none';
+        document.getElementById('startBtn').style.background = "#065f46";
+        document.getElementById('startBtn').innerText = "AUDIO LIVE";
         render();
     } catch (e) { alert("Mic Access Denied"); }
 }
 
-// --- INTIFACE v3.2.2 FINAL STABLE CONNECT ---
+// --- INTIFACE v3.2.2 STABLE ---
 async function initIntiface() {
     const btn = document.getElementById('intifaceBtn');
+    const ButtplugLib = window.Buttplug || window.buttplug;
     
-    // FAILSAFE: Find the library regardless of casing
-    const bpLib = window.Buttplug || window.buttplug;
-    
-    if (!bpLib) {
-        console.error("Buttplug library not found in window object.");
-        alert("Library error: Try refreshing. If you're offline, this won't work.");
+    if (!ButtplugLib) {
+        alert("Library not found. Check your internet connection.");
         return;
     }
 
-    btn.innerText = "Connecting...";
-    
     try {
-        // Instantiate using the library we found
-        bpClient = new bpLib.ButtplugClient("Haptic Mapper");
-
-        const address = "ws://localhost:12345/buttplug";
-        const connector = new bpLib.ButtplugBrowserWebsocketClientConnector(address);
+        bpClient = new ButtplugLib.ButtplugClient("Haptic Mapper");
+        const connector = new ButtplugLib.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345/buttplug");
 
         await bpClient.connect(connector);
-        
-        btn.innerText = "CONNECTED";
+        btn.innerText = "INTIFACE LIVE";
         btn.style.background = "#10b981";
         await bpClient.startScanning();
     } catch (e) {
         console.error("Intiface Error:", e);
-        btn.innerText = "RETRY";
-        btn.style.background = "#ef4444";
+        alert("Check Intiface Central: Is the server started on port 12345?");
     }
 }
 
+// --- COLOR MATH ---
 function getDynamicColor(b, m, h) {
     const bW = b * 1.0; const mW = m * 2.0; const hW = h * 4.0;
     const max = Math.max(bW, mW, hW);
-    if (max < 2) return '#334155';
+    if (max < 5) return '#334155';
     if (max === bW) return `hsl(220, 90%, 60%)`; 
     if (max === mW) return `hsl(150, 90%, 60%)`; 
     return `hsl(0, 95%, 60%)`; 
 }
 
+// --- MAIN LOOP ---
 function render() {
     requestAnimationFrame(render);
     if (!analyser) return;
@@ -77,6 +70,9 @@ function render() {
     const rawM = getAvg(10, 40);
     const rawH = getAvg(50, 100);
 
+    // Track the highest peak across all active nodes
+    let peakPower = 0;
+
     Object.keys(bodyState).forEach(id => {
         const s = bodyState[id];
         const nB = rawB * s.bass;
@@ -85,24 +81,35 @@ function render() {
         const intensity = nB + nM + nH;
         
         const el = document.getElementById(id);
-        if (el && intensity > s.threshold) {
-            const color = getDynamicColor(nB, nM, nH);
-            el.style.fill = color;
-            el.classList.add('active-glow');
-            el.setAttribute('r', 10 + (intensity/25));
-            
-            if (bpClient && bpClient.connected) {
-                const power = Math.min(intensity / 255, 1.0);
-                bpClient.devices.forEach(d => {
-                    if (d.vibrateAttributes.length > 0) d.vibrate(power).catch(()=>{});
-                });
+        if (el) {
+            if (intensity > s.threshold) {
+                const color = getDynamicColor(nB, nM, nH);
+                el.style.fill = color;
+                el.setAttribute('r', 10 + (intensity/25));
+
+                // Calculate intensity specifically relative to this node's threshold
+                // This prevents "background buzz" from leaking through
+                const nodePower = (intensity - s.threshold) / (255 - s.threshold);
+                if (nodePower > peakPower) {
+                    peakPower = nodePower;
+                }
+            } else {
+                el.style.fill = "#334155";
+                el.setAttribute('r', 10);
             }
-        } else if (el) {
-            el.style.fill = "#334155";
-            el.classList.remove('active-glow');
-            el.setAttribute('r', 10);
         }
     });
+
+    // --- SEND STRENGTH TO HARDWARE ---
+    if (bpClient && bpClient.connected && bpClient.devices.length > 0) {
+        bpClient.devices.forEach(d => {
+            if (d.vibrateAttributes.length > 0) {
+                // Clamp the value between 0 and 1
+                const finalVibe = Math.min(Math.max(peakPower, 0), 1);
+                d.vibrate(finalVibe).catch(() => {});
+            }
+        });
+    }
 }
 
 function getAvg(s, e) {
@@ -111,6 +118,7 @@ function getAvg(s, e) {
     return sum / (e - s + 1);
 }
 
+// --- UI EVENT BINDING ---
 function openMixer(id) {
     activeNodeId = id;
     const s = bodyState[id];
@@ -135,18 +143,11 @@ window.onload = () => {
     });
 
     ['bass', 'mid', 'high'].forEach(k => {
-        const slider = document.getElementById(`mix-${k}`);
-        if (slider) {
-            slider.oninput = (e) => {
-                if (activeNodeId) bodyState[activeNodeId][k] = parseFloat(e.target.value);
-            };
-        }
-    });
-    
-    const thresh = document.getElementById('node-threshold');
-    if (thresh) {
-        thresh.oninput = (e) => {
-            if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+        document.getElementById(`mix-${k}`).oninput = (e) => {
+            if (activeNodeId) bodyState[activeNodeId][k] = parseFloat(e.target.value);
         };
-    }
+    });
+    document.getElementById('node-threshold').oninput = (e) => {
+        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+    };
 };
