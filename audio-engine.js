@@ -10,7 +10,7 @@ const bodyState = {
     "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 50 }
 };
 
-// --- AUDIO INITIALIZATION ---
+// --- AUDIO ENGINE ---
 async function initAudio() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -22,46 +22,38 @@ async function initAudio() {
         dataArray = new Uint8Array(analyser.frequencyBinCount);
         document.getElementById('startBtn').style.display = 'none';
         render();
-    } catch (e) { 
-        console.error(e);
-        alert("Microphone access denied."); 
-    }
+    } catch (e) { alert("Mic Access Denied"); }
 }
 
-// --- INTIFACE / BUTTPLUG CONNECTION (v3.0.0 FIX) ---
+// --- INTIFACE v3.0 FIX ---
 async function initIntiface() {
     const btn = document.getElementById('intifaceBtn');
     btn.innerText = "Connecting...";
     
     try {
-        // In v3.0, we use ButtplugClient and the Websocket Connector directly
-        bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
+        // V3 Global is lowercase 'buttplug'
+        bpClient = new buttplug.ButtplugClient("Haptic Mapper");
 
-        // The connector class name updated in v3
-        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345/buttplug");
+        // Use the Browser Websocket Connector
+        const address = "ws://localhost:12345/buttplug";
+        const connector = new buttplug.ButtplugBrowserWebsocketClientConnector(address);
 
         await bpClient.connect(connector);
         
         btn.innerText = "CONNECTED";
-        btn.style.background = "var(--green)";
-        
-        // Start scanning for hardware
+        btn.style.background = "#10b981";
         await bpClient.startScanning();
-        
-        console.log("Intiface Connected. Scanning for devices...");
     } catch (e) {
-        console.error("Connection Error:", e);
-        btn.innerText = "RETRY INTIFACE";
-        btn.style.background = "var(--red)";
-        alert("Could not connect. Is Intiface Central running with the Server STARTED?");
+        console.error("Intiface Error:", e);
+        btn.innerText = "RETRY";
+        btn.style.background = "#ef4444";
+        alert("Ensure Intiface Central is running and the Server is STARTED.");
     }
 }
 
-// --- COLOR ENGINE ---
+// --- RENDERING & COLOR ---
 function getDynamicColor(b, m, h) {
-    const bW = b * 1.0;
-    const mW = m * 2.0;
-    const hW = h * 4.0;
+    const bW = b * 1.0; const mW = m * 2.0; const hW = h * 4.0;
     const max = Math.max(bW, mW, hW);
     if (max < 2) return '#334155';
     if (max === bW) return `hsl(220, 90%, 60%)`; 
@@ -86,39 +78,34 @@ function render() {
         const intensity = nB + nM + nH;
         
         const el = document.getElementById(id);
-        if (el) {
-            if (intensity > s.threshold) {
-                const color = getDynamicColor(nB, nM, nH);
-                el.style.fill = color;
-                el.classList.add('active-glow');
-                el.setAttribute('r', 10 + (intensity/25));
-                
-                // --- PHYSICAL HAPTIC OUTPUT ---
-                if (bpClient && bpClient.connected && bpClient.devices.length > 0) {
-                    const power = Math.min(intensity / 255, 1.0);
-                    bpClient.devices.forEach(d => {
-                        // Check if device supports vibration
-                        if (d.vibrateAttributes.length > 0) {
-                            d.vibrate(power).catch(() => {}); // Send and ignore errors
-                        }
-                    });
-                }
-            } else {
-                el.style.fill = "#334155";
-                el.classList.remove('active-glow');
-                el.setAttribute('r', 10);
+        if (el && intensity > s.threshold) {
+            const color = getDynamicColor(nB, nM, nH);
+            el.style.fill = color;
+            el.classList.add('active-glow');
+            el.setAttribute('r', 10 + (intensity/25));
+            
+            // Send to Haptics
+            if (bpClient && bpClient.connected) {
+                const power = Math.min(intensity / 255, 1.0);
+                bpClient.devices.forEach(d => {
+                    if (d.vibrateAttributes.length > 0) d.vibrate(power).catch(()=>{});
+                });
             }
+        } else if (el) {
+            el.style.fill = "#334155";
+            el.classList.remove('active-glow');
+            el.setAttribute('r', 10);
         }
     });
 }
 
-function getAvg(start, end) {
+function getAvg(s, e) {
     let sum = 0;
-    for (let i = start; i <= end; i++) sum += dataArray[i];
-    return sum / (end - start + 1);
+    for (let i = s; i <= e; i++) sum += dataArray[i];
+    return sum / (e - s + 1);
 }
 
-// --- UI FLOW ---
+// --- UI PERSISTENCE ---
 function openMixer(id) {
     activeNodeId = id;
     const s = bodyState[id];
@@ -127,7 +114,6 @@ function openMixer(id) {
     document.getElementById('mix-mid').value = s.mid;
     document.getElementById('mix-high').value = s.high;
     document.getElementById('node-threshold').value = s.threshold;
-
     document.getElementById('bodyView').classList.add('hidden');
     document.getElementById('mixerView').classList.remove('hidden');
 }
@@ -139,24 +125,16 @@ window.onload = () => {
         document.getElementById('mixerView').classList.add('hidden');
         document.getElementById('bodyView').classList.remove('hidden');
     };
-
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('node')) openMixer(e.target.id);
     });
 
-    ['bass', 'mid', 'high'].forEach(key => {
-        const el = document.getElementById(`mix-${key}`);
-        if(el) {
-            el.oninput = (e) => {
-                if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
-            };
-        }
-    });
-    
-    const thresh = document.getElementById('node-threshold');
-    if(thresh) {
-        thresh.oninput = (e) => {
-            if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+    ['bass', 'mid', 'high'].forEach(k => {
+        document.getElementById(`mix-${k}`).oninput = (e) => {
+            if (activeNodeId) bodyState[activeNodeId][k] = parseFloat(e.target.value);
         };
-    }
+    });
+    document.getElementById('node-threshold').oninput = (e) => {
+        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+    };
 };
