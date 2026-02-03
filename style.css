@@ -23,6 +23,18 @@ header { margin-bottom: 10px; }
 .threshold-rack { background: var(--card); padding: 20px; border-radius: 15px; margin-bottom: 20px; text-align: left; }
 .threshold-rack label { display: block; margin-bottom: 10px; font-size: 0.8rem; color: #94a3b8; }
 
+#status-tag {
+    font-size: 0.65rem;
+    font-weight: bold;
+    letter-spacing: 1px;
+    margin-top: 8px;
+    padding: 2px 8px;
+    border-radius: 4px;
+    display: inline-block;
+}
+.status-off { background: #334155; color: #94a3b8; }
+.status-on { background: #065f46; color: #34d399; }
+
 .save-btn { width: 100%; background: var(--green); color: white; border: none; padding: 18px; border-radius: 12px; font-weight: bold; cursor: pointer; }
 
 #startBtn, #intifaceBtn { background: var(--accent); border: none; padding: 10px 15px; color: white; border-radius: 8px; font-size: 0.8rem; cursor: pointer; min-width: 120px; }
