@@ -38,7 +38,7 @@ async function initIntiface() {
         bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
 
         // The connector class name updated in v3
-        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345");
+        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345/buttplug");
 
         await bpClient.connect(connector);
         
