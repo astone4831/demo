@@ -1,7 +1,6 @@
 let audioContext, analyser, dataArray, bpClient;
 let activeNodeId = null;
 
-// Initial State / Defaults
 const bodyState = {
     "node-L-Shoulder": { label: "Left Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 50 },
     "node-R-Shoulder": { label: "Right Shoulder", bass: 0.8, mid: 0.2, high: 0.1, threshold: 50 },
@@ -11,7 +10,7 @@ const bodyState = {
     "node-Back": { label: "Back", bass: 0.7, mid: 0.5, high: 0.5, threshold: 50 }
 };
 
-// --- ENGINE START ---
+// --- AUDIO INITIALIZATION ---
 async function initAudio() {
     try {
         audioContext = new (window.AudioContext || window.webkitAudioContext)();
@@ -26,18 +25,28 @@ async function initAudio() {
     } catch (e) { alert("Mic Access Denied"); }
 }
 
-// --- COLOR ENGINE (With 0-value check) ---
+// --- INTIFACE CONNECTION ---
+async function initIntiface() {
+    const connector = new Buttplug.ButtplugBrowserWebsocketConnectorOptions("ws://localhost:12345/buttplug");
+    bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
+    try {
+        await bpClient.connect(connector);
+        document.getElementById('intifaceBtn').innerText = "DEVICE CONNECTED";
+        document.getElementById('intifaceBtn').style.background = "#10b981";
+        await bpClient.startScanning();
+    } catch (e) { alert("Intiface Central not detected. Is it running on port 12345?"); }
+}
+
+// --- COLOR ENGINE ---
 function getDynamicColor(b, m, h) {
     const bW = b * 1.0;
-    const mW = m * 1.8; // Boost mids for visibility
-    const hW = h * 3.5; // Heavy boost for high-freq snaps
-
+    const mW = m * 2.0;
+    const hW = h * 4.0;
     const max = Math.max(bW, mW, hW);
     if (max < 2) return '#334155';
-
-    if (max === bW) return `hsl(220, 90%, 60%)`; // Blue
-    if (max === mW) return `hsl(150, 90%, 60%)`; // Green
-    return `hsl(0, 95%, 60%)`; // Red
+    if (max === bW) return `hsl(220, 90%, 60%)`; 
+    if (max === mW) return `hsl(150, 90%, 60%)`; 
+    return `hsl(0, 95%, 60%)`; 
 }
 
 function render() {
@@ -61,11 +70,17 @@ function render() {
             if (intensity > s.threshold) {
                 const color = getDynamicColor(nB, nM, nH);
                 el.style.fill = color;
-                el.style.filter = `drop-shadow(0 0 10px ${color})`;
+                el.classList.add('active-glow');
                 el.setAttribute('r', 10 + (intensity/25));
+                
+                // Intiface vibration
+                if (bpClient && bpClient.devices.length > 0) {
+                    const power = Math.min(intensity / 255, 1.0);
+                    bpClient.devices.forEach(d => d.vibrate(power));
+                }
             } else {
                 el.style.fill = "#334155";
-                el.style.filter = "none";
+                el.classList.remove('active-glow');
                 el.setAttribute('r', 10);
             }
         }
@@ -78,13 +93,10 @@ function getAvg(start, end) {
     return sum / (end - start + 1);
 }
 
-// --- UI / STATE MANAGEMENT ---
-
+// --- UI FLOW ---
 function openMixer(id) {
     activeNodeId = id;
     const s = bodyState[id];
-
-    // CRITICAL: Set slider positions to MATCH the saved state
     document.getElementById('activeNodeLabel').innerText = s.label;
     document.getElementById('mix-bass').value = s.bass;
     document.getElementById('mix-mid').value = s.mid;
@@ -97,32 +109,24 @@ function openMixer(id) {
 
 window.addEventListener('DOMContentLoaded', () => {
     document.getElementById('startBtn').onclick = initAudio;
+    document.getElementById('intifaceBtn').onclick = initIntiface;
 
-    // Node Selection
     document.addEventListener('click', (e) => {
-        if (e.target.classList.contains('node')) {
-            openMixer(e.target.id);
-        }
+        if (e.target.classList.contains('node')) openMixer(e.target.id);
     });
 
-    // Back / Save
     document.getElementById('backBtn').onclick = () => {
         document.getElementById('mixerView').classList.add('hidden');
         document.getElementById('bodyView').classList.remove('hidden');
     };
 
-    // Live State Sync (Updates object as you slide)
+    // Live State Sync
     ['bass', 'mid', 'high'].forEach(key => {
         document.getElementById(`mix-${key}`).oninput = (e) => {
-            if (activeNodeId) {
-                bodyState[activeNodeId][key] = parseFloat(e.target.value);
-            }
+            if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
         };
     });
-
     document.getElementById('node-threshold').oninput = (e) => {
-        if (activeNodeId) {
-            bodyState[activeNodeId].threshold = parseInt(e.target.value);
-        }
+        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
     };
 });
