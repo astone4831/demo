@@ -38,7 +38,7 @@ async function initIntiface() {
         await Buttplug.buttplugInit();
         
         // Setup connector (ws://localhost:12345/buttplug is the default)
-        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345/buttplug");
+        const connector = new Buttplug.ButtplugBrowserWebsocketClientConnector("ws://localhost:12345");
         bpClient = new Buttplug.ButtplugClient("Haptic Mapper");
 
         await bpClient.connect(connector);
