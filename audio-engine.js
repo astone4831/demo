@@ -25,16 +25,23 @@ async function initAudio() {
     } catch (e) { alert("Mic Access Denied"); }
 }
 
-// --- INTIFACE v3.0 FIX ---
+// --- INTIFACE v3.2.2 FIX ---
 async function initIntiface() {
     const btn = document.getElementById('intifaceBtn');
+    
+    // Safety check for the global object
+    if (typeof buttplug === 'undefined') {
+        console.error("Buttplug library not loaded yet.");
+        alert("The library is still loading. Wait 2 seconds and try again.");
+        return;
+    }
+
     btn.innerText = "Connecting...";
     
     try {
-        // V3 Global is lowercase 'buttplug'
+        // Correct namespace for v3 Web
         bpClient = new buttplug.ButtplugClient("Haptic Mapper");
 
-        // Use the Browser Websocket Connector
         const address = "ws://localhost:12345/buttplug";
         const connector = new buttplug.ButtplugBrowserWebsocketClientConnector(address);
 
@@ -51,7 +58,6 @@ async function initIntiface() {
     }
 }
 
-// --- RENDERING & COLOR ---
 function getDynamicColor(b, m, h) {
     const bW = b * 1.0; const mW = m * 2.0; const hW = h * 4.0;
     const max = Math.max(bW, mW, hW);
@@ -84,7 +90,6 @@ function render() {
             el.classList.add('active-glow');
             el.setAttribute('r', 10 + (intensity/25));
             
-            // Send to Haptics
             if (bpClient && bpClient.connected) {
                 const power = Math.min(intensity / 255, 1.0);
                 bpClient.devices.forEach(d => {
@@ -105,7 +110,6 @@ function getAvg(s, e) {
     return sum / (e - s + 1);
 }
 
-// --- UI PERSISTENCE ---
 function openMixer(id) {
     activeNodeId = id;
     const s = bodyState[id];
