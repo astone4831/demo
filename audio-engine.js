@@ -13,9 +13,7 @@ const bodyState = {
 // --- CORE ENGINE ---
 async function initAudio() {
     try {
-        if (!audioContext) {
-            audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        }
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         const source = audioContext.createMediaStreamSource(stream);
         
@@ -25,22 +23,27 @@ async function initAudio() {
         
         dataArray = new Uint8Array(analyser.frequencyBinCount);
         document.getElementById('startBtn').style.display = 'none';
-        document.getElementById('status-tag').innerText = "LIVE";
         render();
     } catch (err) {
-        console.error("Mic failed:", err);
+        console.error("Mic error:", err);
     }
 }
 
-// Helper to calculate color based on frequency dominance
-// Blue (240deg) for Bass, Red (0deg) for Highs
-function getHapticColor(b, m, h) {
-    const total = b + m + h;
-    if (total === 0) return '#334155';
+// THE FIX: Direct color mapping based on dominance
+function getDominantColor(b, m, h) {
+    // If it's mostly bass, Hue = 220 (Blue)
+    // If it's mostly mids, Hue = 140 (Green/Teal)
+    // If it's mostly highs, Hue = 0 (Red)
     
-    // Weight the hue: Bass moves it toward 240, Highs move it toward 0/360
-    const hue = ((b * 240) + (m * 120) + (h * 0)) / total;
-    return `hsl(${hue}, 80%, 60%)`;
+    const maxVal = Math.max(b, m, h);
+    if (maxVal < 5) return '#334155'; // Dead state
+
+    let hue;
+    if (maxVal === b) hue = 220; // Bass Blue
+    else if (maxVal === m) hue = 140; // Mid Green
+    else hue = 0; // High Red
+
+    return `hsl(${hue}, 90%, 60%)`;
 }
 
 function render() {
@@ -48,21 +51,28 @@ function render() {
     if (!analyser) return;
     analyser.getByteFrequencyData(dataArray);
 
-    const b = getAvg(0, 8);
-    const m = getAvg(9, 45);
-    const h = getAvg(46, 100);
+    // Get Raw Band Energy
+    const rawB = getAvg(0, 6);
+    const rawM = getAvg(7, 30);
+    const rawH = getAvg(31, 100);
 
     Object.keys(bodyState).forEach(id => {
         const s = bodyState[id];
-        const mixed = (b * s.bass) + (m * s.mid) + (h * s.high);
+        
+        // Calculate the specific energy for THIS node's settings
+        const nodeB = rawB * s.bass;
+        const nodeM = rawM * s.mid;
+        const nodeH = rawH * s.high;
+        
+        const mixedTotal = nodeB + nodeM + nodeH;
         const el = document.getElementById(id);
         
         if (el) {
-            if (mixed > s.threshold) {
-                const color = getHapticColor(b * s.bass, m * s.mid, h * s.high);
+            if (mixedTotal > s.threshold) {
+                const color = getDominantColor(nodeB, nodeM, nodeH);
                 el.style.fill = color;
-                el.style.filter = `drop-shadow(0 0 8px ${color})`;
-                el.setAttribute('r', 12 + (mixed / 50)); 
+                el.style.filter = `drop-shadow(0 0 12px ${color})`;
+                el.setAttribute('r', 10 + (mixedTotal / 40)); 
             } else {
                 el.style.fill = "#334155";
                 el.style.filter = "none";
@@ -78,9 +88,8 @@ function getAvg(start, end) {
 }
 
 // --- UI EVENT BINDING ---
-window.onload = () => {
-    const startBtn = document.getElementById('startBtn');
-    if (startBtn) startBtn.onclick = initAudio;
+window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('startBtn').onclick = initAudio;
 
     document.addEventListener('click', (e) => {
         if (e.target.classList.contains('node')) {
@@ -102,15 +111,14 @@ window.onload = () => {
         document.getElementById('mixerView').classList.add('hidden');
         document.getElementById('bodyView').classList.remove('hidden');
     };
-};
 
-// Sync sliders to state
-['bass', 'mid', 'high'].forEach(key => {
-    const slider = document.getElementById(`mix-${key}`);
-    if (slider) {
-        slider.oninput = (e) => {
+    // Sliders Sync
+    ['bass', 'mid', 'high'].forEach(key => {
+        document.getElementById(`mix-${key}`).oninput = (e) => {
             if (activeNodeId) bodyState[activeNodeId][key] = parseFloat(e.target.value);
         };
-    }
-});iveNodeId].threshold = parseInt(e.target.value);
-};
+    });
+    document.getElementById('node-threshold').oninput = (e) => {
+        if (activeNodeId) bodyState[activeNodeId].threshold = parseInt(e.target.value);
+    };
+});
